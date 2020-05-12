@@ -83,7 +83,7 @@ class SpectralClusterer(object):
         else:
             raise ValueError("Unknown refinement operation: {}".format(name))
 
-    def predict(self, X):
+    def predict(self, X, row_norm = False):
         """Perform spectral clustering on data X.
 
         Args:
@@ -119,7 +119,11 @@ class SpectralClusterer(object):
 
         # Get spectral embeddings.
         spectral_embeddings = eigenvectors[:, :k]
-
+        
+        if row_norm:
+            length = np.sqrt((spectral_embeddings**2).sum(axis=1))[:,None]
+            spectral_embeddings = spectral_embeddings / length
+        
         # Run K-Means++ on spectral embeddings.
         # Note: The correct way should be using a K-Means implementation
         # that supports customized distance measure such as cosine distance.
