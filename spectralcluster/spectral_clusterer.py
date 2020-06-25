@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+from copy import copy as cp
 from sklearn.cluster import KMeans
 from spectralcluster import refinement
 from spectralcluster import utils
@@ -136,3 +137,69 @@ class SpectralClusterer(object):
             random_state=0)
         labels = kmeans_clusterer.fit_predict(spectral_embeddings)
         return labels
+    
+    def predict_recursive(self, X, row_norm = False, unpack = False):
+        """Perform recursive spectral clustering on data X.  Specifically, we run the clustering on X, and if there are more 
+        than 1 labels, we re-run the clustering on the subsets of the data corresponding to those labels until no subset 
+        returns more than one label.
+
+        Args:
+            X: numpy array of shape (n_samples, n_features)
+
+        Returns:
+            results:  A dictionary of the recursive clustering if unpack = False, or an array of speaker ids of shape
+            (n_samples,)
+
+        Raises:
+            TypeError: if X has wrong type
+            ValueError: if X has wrong shape
+        """
+        results = {}
+
+        labels = self.predict(X, row_norm = row_norm)
+        
+        # remove singleton labels
+        labels = np.array([el if len([z for z in labels if z == el]) > 1 else 's' for el in labels])
+        
+        results['labels'] = labels
+
+        if len(np.unique(labels)) > 1:
+            results['sublabels'] = {}
+            for lab in np.unique(labels):
+                inds = np.where(labels == lab)[0]
+                if lab == 's':
+                    results['sublabels'][lab] = {'labels':labels[inds]}
+                else:
+                    results['sublabels'][lab] = self.predict_recursive(X[inds], row_norm, unpack = False)
+            
+        if unpack:
+            results = unpack_labels(results)
+        
+        return results
+    
+def unpack_labels(cluster_tree):
+    """
+    Flatten the results of predict_recursive() into a 1-d result
+    
+    Args:
+        cluster_tree: dictionary result of calling predict_recursive with unpack = False
+
+    Returns:
+        labels: numpy array of shape (n_samples,)
+    """
+    labels = cluster_tree['labels']
+    out_labels = cp(labels)
+    out_labels = out_labels.astype("str")
+
+    if('sublabels' in cluster_tree.keys()):
+        for lab in cluster_tree['sublabels'].keys(): 
+            newlabs = unpack_labels(cluster_tree['sublabels'][lab]).astype("str")
+            prependlabs = np.array([str(lab)+"-"]*len(newlabs))
+            newlabs = np.char.add(prependlabs, newlabs)
+
+            inds = np.where(labels == lab)
+            out_labels[inds] = newlabs
+    
+    return out_labels
+        
+        
