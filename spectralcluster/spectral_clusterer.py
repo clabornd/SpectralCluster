@@ -83,7 +83,31 @@ class SpectralClusterer(object):
             return refinement.RowWiseNormalize()
         else:
             raise ValueError("Unknown refinement operation: {}".format(name))
+    
+    def get_eigen_inputs(self, X):
+        if not isinstance(X, np.ndarray):
+            raise TypeError("X must be a numpy array")
+        if len(X.shape) != 2:
+            raise ValueError("X must be 2-dimensional")
+        #  Compute affinity matrix.
+        affinity = utils.compute_affinity_matrix(X)
 
+        # Refinement opertions on the affinity matrix.
+        for refinement_name in self.refinement_sequence:
+            op = self._get_refinement_operator(refinement_name)
+            affinity = op.refine(affinity)
+            
+        # Perform eigen decomposion.
+        (eigenvalues, eigenvectors) = utils.compute_sorted_eigenvectors(
+            affinity)
+        # Get number of clusters.
+        k = utils.compute_number_of_clusters(
+            eigenvalues, self.max_clusters, self.stop_eigenvalue)
+        if self.min_clusters is not None:
+            k = max(k, self.min_clusters)
+
+        return k, affinity, eigenvectors, eigenvalues
+        
     def predict(self, X, row_norm = False):
         """Perform spectral clustering on data X.
 
@@ -97,26 +121,9 @@ class SpectralClusterer(object):
             TypeError: if X has wrong type
             ValueError: if X has wrong shape
         """
-        if not isinstance(X, np.ndarray):
-            raise TypeError("X must be a numpy array")
-        if len(X.shape) != 2:
-            raise ValueError("X must be 2-dimensional")
-        #  Compute affinity matrix.
-        affinity = utils.compute_affinity_matrix(X)
-
-        # Refinement opertions on the affinity matrix.
-        for refinement_name in self.refinement_sequence:
-            op = self._get_refinement_operator(refinement_name)
-            affinity = op.refine(affinity)
-
-        # Perform eigen decomposion.
-        (eigenvalues, eigenvectors) = utils.compute_sorted_eigenvectors(
-            affinity)
-        # Get number of clusters.
-        k = utils.compute_number_of_clusters(
-            eigenvalues, self.max_clusters, self.stop_eigenvalue)
-        if self.min_clusters is not None:
-            k = max(k, self.min_clusters)
+        
+        k, affinity, eigenvectors, _ = self.get_eigen_inputs(X)
+        
 
         # Get spectral embeddings.
         spectral_embeddings = eigenvectors[:, :k]
