@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-
+from scipy.sparse.linalg import eigs
 
 def compute_affinity_matrix(X):
     """Compute the affinity matrix from data.
@@ -27,19 +27,24 @@ def compute_affinity_matrix(X):
     return affinity
 
 
-def compute_sorted_eigenvectors(A):
+def compute_sorted_eigenvectors(A, sparse = False, **kwargs):
     """Sort eigenvectors by the real part of eigenvalues.
 
     Args:
         A: the matrix to perform eigen analysis with shape (M, M)
-
+        sparse: perform sparse eigen-decomposition, useful for large A
+        **kwargs: if sparse == True, arguments passed to scipy.sparse.linalg.eigs
     Returns:
         w: sorted eigenvalues of shape (M,)
         v: sorted eigenvectors, where v[;, i] corresponds to ith largest
            eigenvalue
     """
     # Eigen decomposition.
-    eigenvalues, eigenvectors = np.linalg.eig(A)
+    if sparse:
+        assert kwargs['k'] is not None, "If sparse == True, you must specify the number of eigenvalues: n_eig"
+        eigenvalues, eigenvectors = eigs(A, **kwargs)
+    else:
+        eigenvalues, eigenvectors = np.linalg.eig(A)
     eigenvalues = eigenvalues.real
     eigenvectors = eigenvectors.real
     # Sort from largest to smallest.

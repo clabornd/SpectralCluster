@@ -84,7 +84,23 @@ class SpectralClusterer(object):
         else:
             raise ValueError("Unknown refinement operation: {}".format(name))
     
-    def get_eigen_inputs(self, X):
+    def get_eigen_inputs(self, X, sparse = False, **kwargs):
+        """Get the values used as input to Kmeans.
+
+        Args:
+            X: numpy array to performe eigen-decomposition on
+            sparse: whether or not to use sparse eigen-decomposition
+            **kwargs:  extra arguments passed to spectralcluster.utils.compute_sorted_eigenvalues
+
+        Returns:
+            k: predicted number of clusters
+            affinity: the refined affinity matrix
+            eigenvectors: real eigenvectors of the affinity matrix
+            eigenvalues:  real eigenvalues of the affinity matrix
+
+        Raises:
+            ValueError: if name is an unknown refinement operation
+        """
         if not isinstance(X, np.ndarray):
             raise TypeError("X must be a numpy array")
         if len(X.shape) != 2:
@@ -99,7 +115,7 @@ class SpectralClusterer(object):
             
         # Perform eigen decomposion.
         (eigenvalues, eigenvectors) = utils.compute_sorted_eigenvectors(
-            affinity)
+            affinity, sparse = sparse, **kwargs)
         # Get number of clusters.
         k = utils.compute_number_of_clusters(
             eigenvalues, self.max_clusters, self.stop_eigenvalue)
@@ -108,12 +124,13 @@ class SpectralClusterer(object):
 
         return k, affinity, eigenvectors, eigenvalues
         
-    def predict(self, X, row_norm = False):
+    def predict(self, X, row_norm = False, **kwargs):
         """Perform spectral clustering on data X.
 
         Args:
             X: numpy array of shape (n_samples, n_features)
-
+            row_norm: whether to l2-normalize the rows of the spectral embeddings before clustering
+            **kwargs:  arguments passed to self.get_eigen_inputs
         Returns:
             labels: numpy array of shape (n_samples,)
 
@@ -122,7 +139,7 @@ class SpectralClusterer(object):
             ValueError: if X has wrong shape
         """
         
-        k, affinity, eigenvectors, _ = self.get_eigen_inputs(X)
+        k, affinity, eigenvectors, _ = self.get_eigen_inputs(X, **kwargs)
         
 
         # Get spectral embeddings.
